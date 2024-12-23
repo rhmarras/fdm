@@ -51,43 +51,22 @@ async function initSamples() {
 }
 
 function serializePattern() {
-    const timeSig = document.getElementById('timeSig').value;
-    const tempo = document.getElementById('tempo').value;
-    const kit = document.getElementById('kit').value;
-    
-    // Create a compact representation
-    const parts = [timeSig, tempo, kit];
-    
-    // Serialize sequence more compactly
-    instruments.forEach(instrument => {
-        const instrumentPattern = sequence[instrument]
-            .map(val => val ? (val === 2 ? '2' : '1') : '0')
-            .join('');
-        parts.push(instrumentPattern);
-    });
-    
-    return parts.join('|');
+        const data = {
+            timeSig: document.getElementById('timeSig').value,
+            tempo: document.getElementById('tempo').value,
+            kit: document.getElementById('kit').value,
+            sequence
+        };
+        return btoa(JSON.stringify(data));
 }
 
 function deserializePattern(encoded) {
     try {
-        const parts = encoded.split('|');
-        if (parts.length < 3 + instruments.length) return false;
-        
-        document.getElementById('timeSig').value = parts[0];
-        document.getElementById('tempo').value = parts[1];
-        document.getElementById('kit').value = parts[2];
-        
-        // Reconstruct sequence
-        instruments.forEach((instrument, index) => {
-            sequence[instrument] = parts[index + 3]
-                .split('')
-                .map(char => {
-                    if (char === '0') return false;
-                    return char === '2' ? 2 : 1;
-                });
-        });
-        
+        const data = JSON.parse(atob(encoded));
+        document.getElementById('timeSig').value = data.timeSig;
+        document.getElementById('tempo').value = data.tempo;
+        document.getElementById('kit').value = data.kit;
+        sequence = data.sequence;
         return true;
     } catch (e) {
         console.error('Invalid pattern', e);
@@ -97,7 +76,7 @@ function deserializePattern(encoded) {
 
 function updateShare() {
     const encoded = serializePattern();
-    document.getElementById('shareUrl').value = `${location.href.split('?')[0]}?p=${encoded}`;
+    document.getElementById('shareUrl').value = `${location.href.split('?')[0]}?pattern=${encoded}`;
 }
 
 function updateGridLayout() {
