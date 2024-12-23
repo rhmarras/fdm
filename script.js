@@ -4,15 +4,15 @@ const instruments = [
 ];
 
 const samples = {
-    'Kick': '/bass.mp3',
-    'Snare': '/snare-drum.mp3',
-    'HiHat': '/hihat.mp3',
-    'HiHat Open': '/hihat-open.mp3',
-    'HiHat Foot': '/hihat-foot.mp3',
-    'Ride': '/ride.mp3',
-    'Tom 1': '/tom1.mp3',
-    'Tom 2': '/tom2.mp3',
-    'Floor Tom': '/floor-tom.mp3'
+    'Kick': 'bass.mp3',
+    'Snare': 'snare-drum.mp3',
+    'HiHat': 'hihat.mp3',
+    'HiHat Open': 'hihat-open.mp3',
+    'HiHat Foot': 'hihat-foot.mp3',
+    'Ride': 'ride.mp3',
+    'Tom 1': 'tom1.mp3',
+    'Tom 2': 'tom2.mp3',
+    'Floor Tom': 'floor-tom.mp3'
 };
 
 let audioCtx;
