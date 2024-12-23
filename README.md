@@ -21,18 +21,19 @@ Free Drum Machine - Take your grooves everywhere!
 - Web Audio API for sound generation
 - Vanilla JavaScript implementation
 - Responsive design
-- Offline-compatible
+- Offline-compatible [embedded and regular version]
 
 ## Development
 1. Clone repository
-2. Open `index.html` in a modern browser
+2. Open `index.html` or `single.html` (for embedded) in a modern browser
 3. No additional dependencies required
 
 ## Sharing Patterns
-Pattern URL format: `?p=timeSig|tempo|instrument_patterns`
-- First value: Time signature
-- Second value: Tempo
-- Subsequent values: Instrument note patterns (0=off, 1=on, 2=accent)
+Pattern URL parameter
+- base64 encoded
+- contains tracks and positional info as well as kit, tempo and time signature
+- example:
+  {"timeSig":"3","tempo":"120","sequence":{"Kick":[1,false,false,false,false,false,false,false,null,false],"Snare":[false,false,false,false,1,false,false,false,1],"HiHat":[1,false,false,false,1,false,false,false,1,false],"HiHat Open":[false,false,false,false,false,false,false,false,false],"Ride":[false,false,false,false,false,false,false,false],"Tom 1":[false,false,false,false,false,false,false,false],"Tom 2":[false,false,false,false,false,false,false,false],"Floor Tom":[false,false,false,false,false,false,false,false]}}
 
 ## License
-MIT License
+Apache v2.0 license
