@@ -17,6 +17,7 @@ const samples = {
 
 let audioCtx;
 const sampleCache = new Map();
+const failedSamples = [];
 let sequence = {};
 let isPlaying = false;
 let currentStep = 0;
@@ -46,7 +47,11 @@ async function initSamples() {
     if (!audioCtx) initAudio();
     for (const [name, url] of Object.entries(samples)) {
         const buffer = await loadSample(url);
-        if (buffer) sampleCache.set(name, buffer);
+        if (buffer) {
+            sampleCache.set(name, buffer);
+        } else {
+            failedSamples.push(name);
+        }
     }
 }
 
@@ -74,8 +79,16 @@ function deserializePattern(encoded) {
         const parts = encoded.split('|');
         if (parts.length < 3 + instruments.length) return false;
         
+        const allowedTimeSigs = ['2', '3', '4', '5'];
+        if (!allowedTimeSigs.includes(parts[0])) return false;
         document.getElementById('timeSig').value = parts[0];
+
+        const tempo = parseInt(parts[1]);
+        if (isNaN(tempo) || tempo < 40 || tempo > 240) return false;
         document.getElementById('tempo').value = parts[1];
+
+        const allowedKits = ['webaudio', '808'];
+        if (!allowedKits.includes(parts[2])) return false;
         document.getElementById('kit').value = parts[2];
         
         // Reconstruct sequence
@@ -85,9 +98,12 @@ function deserializePattern(encoded) {
                 .map(char => {
                     if (char === '0') return false;
                     return char === '2' ? 2 : 1;
+                    return char === '2' ? 2 : 1;
                 });
+            if (instrumentPattern.length !== steps) return false;
+            if (!/^[012]+$/.test(instrumentPattern.join(''))) return false;
         });
-        
+
         return true;
     } catch (e) {
         console.error('Invalid pattern', e);
@@ -100,17 +116,18 @@ function updateShare() {
     document.getElementById('shareUrl').value = `${location.href.split('?')[0]}?p=${encoded}`;
 }
 
+const timeSignatures = {
+    2: 8,    // 2/4
+    3: 12,   // 3/4
+    4: 16,   // 4/4
+    5: 20,   // 5/4
+};
+
 function updateGridLayout() {
     const grid = document.getElementById('grid');
     const beatNumbers = document.querySelector('.beat-numbers');
     const timeSig = parseInt(document.getElementById('timeSig').value);
-    const timeSignatures = {
-        2: 8,    // 2/4
-        3: 12,   // 3/4
-        4: 16,   // 4/4
-        5: 20,   // 5/4
-    };
-    steps = timeSignatures[timeSig] || timeSig * 4;
+    steps = timeSignatures[timeSig];
     
     const gridTemplateColumns = `120px repeat(${steps}, 1fr)`;
     grid.style.minWidth = 'min-content';
@@ -135,15 +152,20 @@ function createGrid() {
     const grid = document.getElementById('grid');
     grid.innerHTML = '';
     const timeSig = parseInt(document.getElementById('timeSig').value);
-    steps = timeSig * 4;
+    steps = timeSignatures[timeSig];
 
     instruments.forEach(instrument => {
         sequence[instrument] = sequence[instrument] || new Array(steps).fill(false);
         if (sequence[instrument].length !== steps) {
             sequence[instrument] = sequence[instrument].slice(0, steps);
         }
-        
+
         const row = document.createElement('div');
+        if (failedSamples.includes(instrument)) {
+            row.className = 'drum-row drum-row-disabled';
+        } else {
+            row.className = 'drum-row';
+        }
         row.className = 'drum-row';
         
         const label = document.createElement('div');
@@ -154,6 +176,9 @@ function createGrid() {
         for (let step = 0; step < steps; step++) {
             const cell = document.createElement('button');
             cell.className = 'pattern-cell';
+            if (failedSamples.includes(instrument)) {
+                cell.disabled = true;
+            }
             if (sequence[instrument][step]) {
                 cell.classList.add(sequence[instrument][step] === 2 ? 'accent' : 'active');
             }
@@ -191,6 +216,7 @@ function createSound(type, velocity) {
     const kit = document.getElementById('kit').value;
     
     if (kit === 'webaudio') {
+        // WebAudio Kit - Uses pre-loaded audio samples
         if (sampleCache.has(type)) {
             const source = audioCtx.createBufferSource();
             const gain = audioCtx.createGain();
@@ -229,6 +255,7 @@ function createSound(type, velocity) {
         osc.start();
         osc.stop(audioCtx.currentTime + 0.5);
     } else if (kit === '808') {
+        // 808 Kit - Uses synthesized sounds
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
         
