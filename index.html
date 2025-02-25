@@ -12,6 +12,7 @@
                 <div class="controls">
                     <button class="play" id="play">Play</button>
                     <button class="stop" id="stop">Stop</button>
+                    <button id="clear">Clear</button>
                 </div>
             </div>
             <div class="panel">
@@ -34,6 +35,21 @@
                     <option value="5">5/4</option>
                 </select>
             </div>
+            <div class="panel">
+                <h2>Pattern Storage</h2>
+                <div class="storage-controls">
+                    <button id="savePattern">Save Pattern</button>
+                    <select id="savedPatterns">
+                        <option value="">Load saved pattern...</option>
+                    </select>
+                    <div class="file-controls">
+                        <button id="exportPattern">Export to File</button>
+                        <input type="file" id="importPattern" accept=".txt" style="display: none">
+                        <button onclick="document.getElementById('importPattern').click()">Import from File</button>
+                    </div>
+                    <button id="deletePattern">Delete Pattern</button>
+                </div>
+            </div>
         </div>
 
         <div class="grid-container">
@@ -49,4 +65,3 @@
     <script src="script.js"></script>
 </body>
 </html>
-

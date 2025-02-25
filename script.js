@@ -59,54 +59,80 @@ function serializePattern() {
     const timeSig = document.getElementById('timeSig').value;
     const tempo = document.getElementById('tempo').value;
     const kit = document.getElementById('kit').value;
-    
-    // Create a compact representation
+
+    // Debugging logs in serializePattern
+    console.log('Serialize Pattern - Time Sig:', timeSig, 'Tempo:', tempo, 'Kit:', kit);
+
     const parts = [timeSig, tempo, kit];
-    
-    // Serialize sequence more compactly
+
     instruments.forEach(instrument => {
         const instrumentPattern = sequence[instrument]
             .map(val => val ? (val === 2 ? '2' : '1') : '0')
             .join('');
+        console.log('Serialize Pattern - Instrument:', instrument, 'Pattern:', instrumentPattern, 'Length:', instrumentPattern.length);
         parts.push(instrumentPattern);
     });
-    
+
     return parts.join('|');
 }
 
-function deserializePattern(encoded) {
+function deserializePattern(patternString) {
     try {
-        const parts = encoded.split('|');
-        if (parts.length < 3 + instruments.length) return false;
-        
-        const allowedTimeSigs = ['2', '3', '4', '5'];
-        if (!allowedTimeSigs.includes(parts[0])) return false;
-        document.getElementById('timeSig').value = parts[0];
+        const parts = patternString.split('|');
+        if (parts.length !== 3 + instruments.length) {
+            console.error('Invalid pattern format: Incorrect number of parts');
+            return false;
+        }
 
-        const tempo = parseInt(parts[1]);
-        if (isNaN(tempo) || tempo < 40 || tempo > 240) return false;
-        document.getElementById('tempo').value = parts[1];
+        const [timeSig, tempo, kit, ...instrumentPatterns] = parts;
 
-        const allowedKits = ['webaudio', '808'];
-        if (!allowedKits.includes(parts[2])) return false;
-        document.getElementById('kit').value = parts[2];
-        
-        // Reconstruct sequence
+        if (!['2', '3', '4', '5'].includes(timeSig)) {
+            console.error('Invalid time signature:', timeSig);
+            return false;
+        }
+        if (isNaN(parseInt(tempo, 10)) || parseInt(tempo, 10) <= 0) {
+            console.error('Invalid tempo:', tempo);
+            return false;
+        }
+        if (!['webaudio', '808'].includes(kit)) {
+            console.error('Invalid kit:', kit);
+            return false;
+        }
+
+
+        document.getElementById('timeSig').value = timeSig;
+        document.getElementById('tempo').value = tempo;
+        document.getElementById('kit').value = kit;
+        updateGridLayout();
+
+
         instruments.forEach((instrument, index) => {
-            sequence[instrument] = parts[index + 3]
-                .split('')
-                .map(char => {
-                    if (char === '0') return false;
-                    return char === '2' ? 2 : 1;
-                    return char === '2' ? 2 : 1;
-                });
-            if (instrumentPattern.length !== steps) return false;
-            if (!/^[012]+$/.test(instrumentPattern.join(''))) return false;
+            const pattern = instrumentPatterns[index];
+            if (pattern.length !== steps) {
+                console.error(`Pattern length mismatch for ${instrument}: Expected ${steps}, got ${pattern.length}`);
+                throw new Error(`Pattern length mismatch for ${instrument}: Expected ${steps}, got ${pattern.length}`);
+            }
+            sequence[instrument] = pattern.split('').map(p => {
+                switch (p) {
+                    case '1': return 1;
+                    case '2': return 2;
+                    case '0': return false;
+                    default:
+                        console.error('Invalid pattern character:', p);
+                        return false;
+                }
+            });
         });
 
+        // Update UI controls
+        document.getElementById('timeSig').value = timeSig;
+        document.getElementById('tempo').value = tempo;
+        document.getElementById('kit').value = kit;
+
+        console.log('Final sequence:', sequence);
         return true;
     } catch (e) {
-        console.error('Invalid pattern', e);
+        console.error('Pattern parsing error:', e);
         return false;
     }
 }
@@ -154,25 +180,37 @@ function createGrid() {
     const timeSig = parseInt(document.getElementById('timeSig').value);
     steps = timeSignatures[timeSig];
 
+    // Initialize sequence if it doesn't exist
+    if (!sequence || Object.keys(sequence).length === 0) {
+        sequence = {};
+        instruments.forEach(instrument => {
+            sequence[instrument] = new Array(steps).fill(false);
+        });
+    }
+
     instruments.forEach(instrument => {
-        sequence[instrument] = sequence[instrument] || new Array(steps).fill(false);
+        // Ensure sequence exists for this instrument
+        if (!sequence[instrument]) {
+            sequence[instrument] = new Array(steps).fill(false);
+        }
+        // Adjust sequence length if needed
         if (sequence[instrument].length !== steps) {
             sequence[instrument] = sequence[instrument].slice(0, steps);
+            while (sequence[instrument].length < steps) {
+                sequence[instrument].push(false);
+            }
         }
 
+        // Create row
         const row = document.createElement('div');
-        if (failedSamples.includes(instrument)) {
-            row.className = 'drum-row drum-row-disabled';
-        } else {
-            row.className = 'drum-row';
-        }
-        row.className = 'drum-row';
+        row.className = failedSamples.includes(instrument) ? 'drum-row drum-row-disabled' : 'drum-row';
         
         const label = document.createElement('div');
         label.className = 'row-label';
         label.textContent = instrument;
         row.appendChild(label);
 
+        // Create cells
         for (let step = 0; step < steps; step++) {
             const cell = document.createElement('button');
             cell.className = 'pattern-cell';
@@ -378,6 +416,76 @@ function handleTap() {
     }
 }
 
+// Add Local Storage Functions
+function saveToLocalStorage(name) {
+    const pattern = serializePattern();
+    const savedPatterns = JSON.parse(localStorage.getItem('drumPatterns') || '{}');
+    savedPatterns[name] = pattern;
+    localStorage.setItem('drumPatterns', JSON.stringify(savedPatterns));
+    updateSavedPatternslist();
+}
+
+function loadFromLocalStorage(name) {
+    const savedPatterns = JSON.parse(localStorage.getItem('drumPatterns') || '{}');
+    const pattern = savedPatterns[name];
+    if (pattern && deserializePattern(pattern)) {
+        createGrid();
+        
+        // Update tempo if playing
+        if (isPlaying) {
+            clearInterval(intervalId);
+            play();
+        }
+
+        return true;
+    }
+    return false;
+}
+
+function updateSavedPatternslist() {
+    const select = document.getElementById('savedPatterns');
+    const savedPatterns = JSON.parse(localStorage.getItem('drumPatterns') || '{}');
+    select.innerHTML = '<option value="">Load saved pattern...</option>';
+    Object.keys(savedPatterns).forEach(name => {
+        const option = document.createElement('option');
+        option.value = name;
+        option.textContent = name;
+        select.appendChild(option);
+    });
+}
+
+// File Storage Functions
+function exportToFile() {
+    const pattern = serializePattern();
+    const blob = new Blob([pattern], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'drum-pattern.txt';
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function deleteFromLocalStorage(name) {
+    const savedPatterns = JSON.parse(localStorage.getItem('drumPatterns') || '{}');
+    delete savedPatterns[name];
+    localStorage.setItem('drumPatterns', JSON.stringify(savedPatterns));
+    updateSavedPatternslist();
+}
+
+function importFromFile(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const pattern = e.target.result.trim();
+        if (deserializePattern(pattern)) {
+            createGrid();
+        } else {
+            alert('Invalid pattern file');
+        }
+    };
+    reader.readAsText(file);
+}
+
 // Event Listeners
 document.getElementById('play').onclick = () => {
     if (!isPlaying) {
@@ -394,6 +502,10 @@ document.getElementById('stop').onclick = () => {
     document.querySelectorAll('.pattern-cell').forEach(cell => {
         cell.style.background = '';
     });
+};
+
+document.getElementById('clear').onclick = () => {
+    clearGrid();
 };
 
 document.getElementById('tempo').onchange = e => {
@@ -421,16 +533,70 @@ document.getElementById('kit').onchange = () => {
     updateShare();
 };
 
+document.getElementById('savePattern').onclick = () => {
+    const name = prompt('Enter pattern name:');
+    if (name) saveToLocalStorage(name);
+};
+
+document.getElementById('savedPatterns').onchange = (e) => {
+    if (e.target.value) loadFromLocalStorage(e.target.value);
+};
+
+document.getElementById('exportPattern').onclick = exportToFile;
+
+document.getElementById('deletePattern').onclick = () => {
+    const name = document.getElementById('savedPatterns').value;
+    if (name && confirm(`Are you sure you want to delete "${name}"?`)) {
+        deleteFromLocalStorage(name);
+    }
+};
+
+document.getElementById('importPattern').onchange = (e) => {
+    if (e.target.files.length > 0) {
+        importFromFile(e.target.files[0]);
+    }
+};
+
 // Initialize
 initAudio();
+let initialPattern = null;
+
+// Store URL pattern first
+const urlParams = new URLSearchParams(location.search);
+const patternCode = urlParams.get('p');
+if (patternCode) {
+    initialPattern = patternCode;
+}
+
+// Initialize samples and then apply pattern
 initSamples().then(() => {
-    // Check for pattern in URL on initial load
-    const urlParams = new URLSearchParams(location.search);
-    const patternCode = urlParams.get('p');
-    
-    if (patternCode) {
-        deserializePattern(patternCode);
+    if (initialPattern) {
+        if (deserializePattern(initialPattern)) {
+            createGrid();
+        }
+    } else {
+        createGrid();
     }
-    
-    createGrid();
+    updateGridLayout(); // Add this line to ensure steps is updated
+    updateSavedPatternslist();
+}).catch(error => {
+    console.error('Error initializing samples:', error);
+    // Still create grid even if samples fail to load
+    if (initialPattern) {
+        if (deserializePattern(initialPattern)) {
+            createGrid();
+        }
+    } else {
+        createGrid();
+    }
+    updateGridLayout(); // Add this line to ensure steps is updated
+    updateSavedPatternslist();
 });
+
+function clearGrid() {
+    instruments.forEach(instrument => {
+        sequence[instrument] = new Array(steps).fill(false);
+    });
+    createGrid();
+    updateShare();
+}
